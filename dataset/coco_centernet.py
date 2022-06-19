@@ -2,9 +2,6 @@ from mxnet import nd, gluon, init
 from gluoncv import data as gdata
 
 import sys
-sys.path.insert(0, "/Users/guanghan.ning/Desktop/dev/CenterNet-Gluon/")
-sys.path.insert(0, "/export/guanghan/CenterNet-Gluon/")
-
 import numpy as np
 import math, json, os, cv2
 
@@ -13,17 +10,157 @@ from utils.image import get_affine_transform, affine_transform
 from utils.image import gaussian_radius, draw_umich_gaussian, draw_msra_gaussian
 from utils.image import draw_dense_reg
 
+
 from dataset.coco import COCO
 
 class CenterCOCODataset(COCO):
-    def __init__(self, opt, split):
-        super(CenterCOCODataset, self).__init__(opt, split)
-        # to avoid trouble, we always use contiguous IDs except dealing with cocoapi
-        self.json_id_to_contiguous = None
-        self.contiguous_id_to_json = None
+    def __init__(self, opt, coco_path):
+        super(CenterCOCODataset, self).__init__(opt)
+    
+        images = []
+        categories = []
+        # category_id is from 1 for coco, not 0
+        for i, name in enumerate(self.CLASSES):
+            categories.append({'supercategory':'none',
+                              'id': i+1,
+                              'name': name})
+
+        annotations = []
+        instance_counter = 1
+        image_counter = 1
+
+        with open(coco_path,'r') as fp:
+            lines=fp.readlines()
+
+        for line in lines:
+            # split any white space
+            img_path, ann_path = line.strip().split()
+            img_path = osp.join(self.data_root, self.img_prefix, img_path)
+            ann_path = osp.join(self.data_root, self.ann_prefix, ann_path)
+            # img = Image.open(img_path)
+            # width, height = img.size
+            width, height = imagesize.get(img_path)
+            images.append(
+                dict(id=image_counter,
+                     file_name=img_path,
+                     ann_path=ann_path,
+                     width=width,
+                     height=height))
+
+            try:
+                anns = self.get_txt_ann_info(ann_path)
+            except Exception as e:
+                print(f'bad annotation for {ann_path} with {e}')
+                anns = []
+
+            for ann in anns:
+                ann['image_id']=image_counter
+                ann['id']=instance_counter
+                annotations.append(ann)
+                instance_counter+=1
+
+            image_counter+=1
+
+        ### pycocotool coco init
+        self.coco = COCO()
+        self.coco.dataset['type']='instances'
+        self.coco.dataset['categories']=categories
+        self.coco.dataset['images']=images
+        self.coco.dataset['annotations']=annotations
+        self.coco.createIndex()
+
+        ### mmdetection coco init
+        # avoid the filter problem in CocoDataset, view coco_api.py for detail
+        self.coco.img_ann_map = self.coco.imgToAnns
+        self.coco.cat_img_map = self.coco.catToImgs
+
+        # get valid category_id (in annotation, start from 1, arbitary)
+        self.cat_ids = self.coco.get_cat_ids(cat_names=self.CLASSES)
+        # convert category_id to label(train_id, start from 0)
+        self.cat2label = {cat_id: i for i, cat_id in enumerate(self.cat_ids)}
+        self.img_ids = self.coco.get_img_ids()
+        # self.img_ids = list(self.coco.imgs.keys())
+        assert len(self.img_ids) > 0, 'image number must > 0'
+        N=len(self.img_ids)
+        print(f'load {N} image from YMIR dataset')
+        
         self._coco = []
         self._load_jsons()
         self.classes = self.class_name[1:]
+        
+    def get_ann_path_from_img_path(self,img_path):
+        img_id=osp.splitext(osp.basename(img_path))[0]
+        return osp.join(self.data_root, self.ann_prefix, img_id+'.txt')
+
+    def get_txt_ann_info(self, txt_path):
+        """Get annotation from TXT file by index.
+        Args:
+            idx (int): Index of data.
+        Returns:
+            dict: Annotation info of specified index.
+        """
+
+        # img_id = self.data_infos[idx]['id']
+        # txt_path = osp.splitext(img_path)[0]+'.txt'
+        # txt_path = self.get_ann_path_from_img_path(img_path)
+        anns = []
+        if osp.exists(txt_path):
+            with open(txt_path,'r') as fp:
+                lines=fp.readlines()
+        else:
+            lines=[]
+        for line in lines:
+            obj=[int(x) for x in line.strip().split(',')]
+            # YMIR category id starts from 0, coco from 1
+            category_id, xmin, ymin, xmax, ymax = obj
+            bbox = [xmin, ymin, xmax, ymax]
+            h,w=ymax-ymin,xmax-xmin
+            ignore = 0
+            if self.min_size:
+                assert not self.test_mode
+                w = bbox[2] - bbox[0]
+                h = bbox[3] - bbox[1]
+                if w < self.min_size or h < self.min_size:
+                    ignore = 1
+
+            ann = dict(
+                segmentation=[[xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax]],
+                area=w*h,
+                iscrowd=0,
+                image_id=None,
+                bbox=[xmin, ymin, w, h],
+                category_id=category_id+1, # category id is from 1 for coco
+                id=None,
+                ignore=ignore
+            )
+            anns.append(ann)
+        return anns
+
+    def get_cat_ids(self, idx):
+        """Get category ids in TXT file by index.
+        Args:
+            idx (int): Index of data.
+        Returns:
+            list[int]: All categories in the image of specified index.
+        """
+
+        cat_ids = []
+        # img_path = self.data_infos[idx]['file_name']
+        # txt_path = self.get_ann_path_from_img_path(img_path)
+        txt_path = self.data_infos[idx]['ann_path']
+        txt_path = osp.join(self.data_root, self.ann_prefix, txt_path)
+        if osp.exists(txt_path):
+            with open(txt_path,'r') as fp:
+                lines = fp.readlines()
+        else:
+            lines = []
+
+        for line in lines:
+            obj = [int(x) for x in line.strip().split(',')]
+            # label, xmin, ymin, xmax, ymax = obj
+            cat_ids.append(obj[0])
+
+        return 
 
     def _load_jsons(self):
         _coco = self.coco
