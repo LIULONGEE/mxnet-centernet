@@ -3,8 +3,6 @@ Author: Guanghan Ning
 Date:   August, 2019
 """
 import sys, os, time
-sys.path.insert(0, "/export/guanghan/CenterNet-Gluon/dataset")
-sys.path.insert(0, "/Users/guanghan.ning/Desktop/dev/CenterNet-Gluon/dataset")
 import os.path as osp
 import mxnet as mx
 from mxnet import nd, gluon, init, autograd
@@ -20,9 +18,9 @@ from detectors.center_detector import CenterDetector
 from progress.bar import Bar
 from utils.misc import AverageMeter
 
-def get_coco(opt, coco_path="/in/train-index.tsv"):
+def get_coco(opt, coco_path="/in/train-index.tsv", split='train'):
     """Get coco dataset."""
-    dataset = CenterCOCODataset(opt, coco_path)   # custom dataset
+    dataset = CenterCOCODataset(opt, coco_path, split)   # custom dataset
     return dataset
 
 
@@ -145,8 +143,8 @@ if __name__ == "__main__":
 
     """ 2. Dataset """
     
-    train_dataset = get_coco(opt, "/in/train-index.tsv")
-    val_dataset = get_coco(opt, "/in/val-index.tsv")
+    train_dataset = get_coco(opt, "/in/train-index.tsv", split="train")
+    val_dataset = get_coco(opt, "/in/val-index.tsv", split="val")
     data_shape = opt.input_res
     batch_size = opt.batch_size
     num_workers = opt.num_workers
