@@ -74,12 +74,19 @@ def _run_training(cfg: edict) -> None:
     out_dir = cfg.ymir.output.root_dir
     logging.info(f'generate {out_dir}/data.yaml')
     monitor.write_monitor_logger(percent=get_ymir_process(stage=YmirStage.PREPROCESS, p=1.0))
+    
+    epochs = cfg.param.epochs
+    batch_size = cfg.param.batch_size
+    arch = cfg.param.arch
+    lr = cfg.param.lr
+    gpu = cfg.param.gpu_id
+    num_workers = cfg.param.num_workers
 
     # 2. training model
     model_config = cfg.ymir.param.model_config
     models_dir = cfg.ymir.output.models_dir
     
-    command = f'CUDA_VISIBLE_DEVICES=0,1,2,3 ./tools/dist_train.sh {model_config} 4 --work-dirs {models_dir}'
+    command = f'python train.py --gpu {gpu} --batch_size {batch_size} --arch {arch} --num_workers {num_workers} --lr {lr}'
     logging.info(f'start training: {command}')
 
     subprocess.run(command.split(), check=True)
@@ -88,8 +95,7 @@ def _run_training(cfg: edict) -> None:
     # if task done, write 100% percent log
     monitor.write_monitor_logger(percent=1.0)
 
-    
-
+   
 
 def _run_mining(cfg: edict) -> None:
     pass
