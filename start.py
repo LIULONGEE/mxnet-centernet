@@ -65,61 +65,30 @@ def start() -> int:
 
 def _run_training(cfg: edict) -> None:
     """
-    sample function of training, which shows:
-    1. how to get config
-    2. how to read training and validation datasets
-    3. how to write logs
-    4. how to write training result
+    function for training task
+    1. convert dataset
+    2. training model
+    3. save model weight/hyperparameter/... to design directory
     """
-    # get config
-    class_names: List[str] = cfg.param['class_names']
-    expected_mAP: float = cfg.param.get('map')
-    model: str = cfg.param.get('model')
+    # 1. convert dataset
+    out_dir = cfg.ymir.output.root_dir
+    logging.info(f'generate {out_dir}/data.yaml')
+    monitor.write_monitor_logger(percent=get_ymir_process(stage=YmirStage.PREPROCESS, p=1.0))
 
-    # read training dataset items
-    # note that `dr.item_paths` is a generator
-    for asset_path, ann_path in dr.item_paths(env.DatasetType.TRAINING):
-        logging.info(f"asset: {asset_path}, annotation: {ann_path}")
-        with open(ann_path, 'r') as fp:
-            lines = fp.readlines()
-            for line in lines:
-                class_id, x1, y1, x2, y2 = [int(s)
-                                            for s in line.strip().split(',')]
-                name = class_names[class_id]
-                logging.info(f"{name} xmin={x1} ymin={y1} xmax={x2} ymax={y2}")
-        break
-
-    # write task process percent to monitor.txt
-    monitor.write_monitor_logger(percent=0.0)
-
-    # fake training function
-    _dummy_work(cfg)
-
-    # suppose we have a long time training, and have saved the final model
-    # use `cfg.ymir.output.models_dir` to get model output dir
+    # 2. training model
+    model_config = cfg.ymir.param.model_config
     models_dir = cfg.ymir.output.models_dir
-    os.makedirs(models_dir, exist_ok=True)
-    model_weight = os.path.join(models_dir, f'{model}.pt')
-    os.system(f'touch {model_weight}')
+    
+    command = f'CUDA_VISIBLE_DEVICES=0,1,2,3 ./tools/dist_train.sh {model_config} 4 --work-dirs {models_dir}'
+    logging.info(f'start training: {command}')
 
-    # write other information
-    with open(os.path.join(models_dir, 'model.yaml'), 'w') as f:
-        f.write(f'model: {model}')
-    shutil.copy('models/vgg.py',
-                os.path.join(models_dir, 'vgg.py'))
-
-    # use `rw.write_training_result` to save training result
-    # the files in model_names will be saved and can be download from ymir-web
-    rw.write_training_result(model_names=[f'{model}.pt',
-                                          'model.yaml',
-                                          'vgg.py'],
-                             mAP=expected_mAP,
-                             classAPs={class_name: expected_mAP
-                                       for class_name in class_names})
+    subprocess.run(command.split(), check=True)
+    monitor.write_monitor_logger(percent=get_ymir_process(stage=YmirStage.TASK, p=1.0))
 
     # if task done, write 100% percent log
-    logging.info('task done')
     monitor.write_monitor_logger(percent=1.0)
+
+    
 
 
 def _run_mining(cfg: edict) -> None:
