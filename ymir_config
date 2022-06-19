@@ -1,0 +1,4 @@
+batch_size: 8
+lr: le-4
+arch: hourglass
+gpu: 0,1,2,3
