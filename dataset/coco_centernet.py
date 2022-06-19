@@ -15,32 +15,7 @@ from pycocotools.cocoeval import COCOeval
 
 import mxnet.gluon.data as data
 
-class COCO(data.Dataset):
- 
-  def __init__(self, opt, split):
-    super(COCO, self).__init__()
-    self.data_dir = os.path.join(opt.data_dir, 'coco')
-    self.img_dir = os.path.join(self.data_dir, '{}2017'.format(split))
-    if split == 'test':
-      self.annot_path = os.path.join(
-          self.data_dir, 'annotations',
-          'image_info_test-dev2017.json').format(split)
-    else:
-      if opt.task == 'exdet':
-        self.annot_path = os.path.join(
-          self.data_dir, 'annotations',
-          'instances_extreme_{}2017.json').format(split)
-      else:
-        self.annot_path = os.path.join(
-          self.data_dir, 'annotations',
-          'instances_{}2017.json').format(split)
-    
-    
-  
-
-
-
-class CenterCOCODataset():
+class CenterCOCODataset(data.Dataset):
      num_classes = 80
      default_resolution = [512, 512]
      mean = np.array([0.40789654, 0.44719302, 0.47026115],
@@ -82,7 +57,7 @@ class CenterCOCODataset():
         images = []
         categories = []
         # category_id is from 1 for coco, not 0
-        for i, name in enumerate(self.CLASSES):
+        for i, name in enumerate(self.class_name[1:]):
             categories.append({'supercategory':'none',
                               'id': i+1,
                               'name': name})
@@ -128,7 +103,17 @@ class CenterCOCODataset():
         self.coco.dataset['annotations']=annotations
         self.coco.createIndex()
         
-        self.cat_ids = {v: i for i, v in enumerate(self._valid_ids)}
+        self.images = self.coco.getImgIds()
+        self.num_samples = len(self.images)
+        self.max_objs = 128
+
+        print('Loaded {} {} samples'.format(split, self.num_samples))
+        
+        self._coco = []
+        self._load_jsons()
+        self.classes = self.class_name[1:]
+        
+        self.cat_ids = {v: i for i, v in enumerate(self.valid_ids)}
         self.voc_color = [(v // 32 * 64 + 64, (v // 8) % 4 * 64, v % 8 * 32) \
                       for v in range(1, self.num_classes + 1)]
         self._data_rng = np.random.RandomState(123)
@@ -140,18 +125,7 @@ class CenterCOCODataset():
         [-0.56089297, 0.71832671, 0.41158938]
         ], dtype=np.float32)
 
-        
-        self.images = self.coco.getImgIds()
-        self.num_samples = len(self.images)
-        self.max_objs = 128
-
-        print('Loaded {} {} samples'.format(split, self.num_samples))
-        
-        self._coco = []
-        self._load_jsons()
-        self.classes = self.class_name[1:]
-        
-   
+      
     def get_txt_ann_info(self, txt_path):
         """Get annotation from TXT file by index.
         Args:
@@ -174,15 +148,7 @@ class CenterCOCODataset():
             # YMIR category id starts from 0, coco from 1
             category_id, xmin, ymin, xmax, ymax = obj
             bbox = [xmin, ymin, xmax, ymax]
-            h,w=ymax-ymin,xmax-xmin
-            ignore = 0
-            if self.min_size:
-                assert not self.test_mode
-                w = bbox[2] - bbox[0]
-                h = bbox[3] - bbox[1]
-                if w < self.min_size or h < self.min_size:
-                    ignore = 1
-
+            h, w=ymax-ymin,xmax-xmin
             ann = dict(
                 segmentation=[[xmin, ymin, xmax, ymin, xmax, ymax, xmin, ymax]],
                 area=w*h,
@@ -191,7 +157,7 @@ class CenterCOCODataset():
                 bbox=[xmin, ymin, w, h],
                 category_id=category_id+1, # category id is from 1 for coco
                 id=None,
-                ignore=ignore
+                ignore=False
             )
             anns.append(ann)
         return anns
