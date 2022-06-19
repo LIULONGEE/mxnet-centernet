@@ -284,16 +284,11 @@ class opts(object):
     print('training chunk_sizes:', opt.chunk_sizes)
 
     #opt.root_dir = os.path.join(os.path.dirname(__file__), '..', '..')
-    opt.root_dir = os.path.join(os.path.dirname(__file__))
-    opt.data_dir = os.path.join(opt.root_dir, 'data')
-    opt.exp_dir = os.path.join(opt.root_dir, 'exp', opt.task)
-    opt.save_dir = os.path.join(opt.exp_dir, opt.exp_id)
-    opt.debug_dir = os.path.join(opt.save_dir, 'debug')
-    print('The output will be saved to ', opt.save_dir)
+    print('The output will be saved to ', opt.work_dir)
 
     if opt.resume and opt.load_model == '':
-      model_path = opt.save_dir[:-4] if opt.save_dir.endswith('TEST') \
-                  else opt.save_dir
+      model_path = opt.work_dir[:-4] if opt.work_dir.endswith('TEST') \
+                  else opt.work_dir
       opt.load_model = os.path.join(model_path, 'model_last.pth')
     return opt
 
