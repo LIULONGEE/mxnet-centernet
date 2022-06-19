@@ -65,6 +65,8 @@ class opts(object):
                              help='visualization threshold.')
     self.parser.add_argument('--debugger_theme', default='white',
                              choices=['white', 'black'])
+    self.parser.add_argument('--work_dir', default='/out/models',
+                             help="save dir for saving checkpoints and logs")
 
     # model
     self.parser.add_argument('--arch', default='hourglass',
