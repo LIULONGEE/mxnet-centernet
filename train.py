@@ -5,7 +5,7 @@ Date:   August, 2019
 import sys, os, time
 sys.path.insert(0, "/export/guanghan/CenterNet-Gluon/dataset")
 sys.path.insert(0, "/Users/guanghan.ning/Desktop/dev/CenterNet-Gluon/dataset")
-
+import os.path as osp
 import mxnet as mx
 from mxnet import nd, gluon, init, autograd
 from gluoncv.data.batchify import Tuple, Stack, Pad
@@ -86,7 +86,7 @@ def train(model, train_loader, val_dataset, ctx, opt):
         # Save parameters
         if epoch % opt.save_preiod==0:
             prefix = "CenterNet_" + opt.arch
-            model_path = osp.join(opt.save_dir, '{:s}_{:04d}.params'.format(prefix, epoch))
+            model_path = osp.join(opt.work_dir, '{:s}_{:04d}.params'.format(prefix, epoch))
             if not os.path.exists(model_path):
                 save_model(model, model_path)
 
@@ -126,6 +126,9 @@ def validate(model, dataset, opt, ctx):
 
 if __name__ == "__main__":
     opt = opts().init()
+    with open(osp.join(opt.work_dir, "opt.txt"), "w") as fp:
+        for k, v in opt.items():
+            fo.write(f"{k} = {v}")
     ctx = [mx.gpu(int(i)) for i in opt.gpus_str.split(',') if i.strip()]
     ctx = ctx if ctx else [mx.cpu()]
     print("Using Devices: ", ctx)
