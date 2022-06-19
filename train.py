@@ -84,10 +84,11 @@ def train(model, train_loader, val_dataset, ctx, opt):
         print("Epoch {}, time: {:.1f} hours, training loss: {:.3f}".format(epoch, train_hours, train_loss_per_epoch))
 
         # Save parameters
-        prefix = "CenterNet_" + opt.arch
-        model_path = '{:s}_{:04d}.params'.format(prefix, epoch)
-        if not os.path.exists(model_path):
-            save_model(model, '{:s}_{:04d}.params'.format(prefix, epoch))
+        if epoch % opt.save_preiod==0:
+            prefix = "CenterNet_" + opt.arch
+            model_path = osp.join(opt.save_dir, '{:s}_{:04d}.params'.format(prefix, epoch))
+            if not os.path.exists(model_path):
+                save_model(model, model_path)
 
         # validation loop
         if epoch % opt.val_interval == 0:
