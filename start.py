@@ -86,7 +86,9 @@ def _run_training(cfg: edict) -> None:
     model_config = cfg.ymir.param.model_config
     models_dir = cfg.ymir.output.models_dir
     
-    command = f'python train.py --gpu {gpu} --batch_size {batch_size} --arch {arch} --num_workers {num_workers} --lr {lr}'
+    command = f'python train.py --gpu {gpu} --batch_size {batch_size}'+ \
+              f'--arch {arch} --num_workers {num_workers}' + \
+              f'--lr {lr} num_epochs {epochs}'
     logging.info(f'start training: {command}')
 
     subprocess.run(command.split(), check=True)
