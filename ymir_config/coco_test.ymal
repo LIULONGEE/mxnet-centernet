@@ -1,0 +1,7 @@
+batch_size: 24
+lr: le-4
+arch: hourglass
+gpu: 0,1,2,3
+num_workers: 8
+save_dir: /out/models
+num_epoches: 5
