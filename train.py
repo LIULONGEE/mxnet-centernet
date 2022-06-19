@@ -20,12 +20,10 @@ from detectors.center_detector import CenterDetector
 from progress.bar import Bar
 from utils.misc import AverageMeter
 
-def get_coco(opt, coco_path="/export/guanghan/coco"):
+def get_coco(opt, coco_path="/in/train-index.tsv"):
     """Get coco dataset."""
-    train_dataset = CenterCOCODataset(opt, split = 'train')   # custom dataset
-    val_dataset = CenterCOCODataset(opt, split = 'val')   # custom dataset
-    opt.val_interval = 10
-    return train_dataset, val_dataset
+    dataset = CenterCOCODataset(opt, coco_path)   # custom dataset
+    return dataset
 
 
 def get_dataloader(train_dataset, data_shape, batch_size, num_workers, ctx):
@@ -121,13 +119,13 @@ def validate(model, dataset, opt, ctx):
         if ind % 1000 == 0:
             bar.next()
     bar.finish()
-    val_dataset.run_eval(results = results, save_dir = './output/')
+    val_dataset.run_eval(results = results, save_dir = '/out/models')
 
 
 if __name__ == "__main__":
     opt = opts().init()
     with open(osp.join(opt.work_dir, "opt.txt"), "w") as fp:
-        for k, v in opt.items():
+        for k, v in vars(opt):
             fo.write(f"{k} = {v}")
     ctx = [mx.gpu(int(i)) for i in opt.gpus_str.split(',') if i.strip()]
     ctx = ctx if ctx else [mx.cpu()]
@@ -146,7 +144,9 @@ if __name__ == "__main__":
         model.collect_params().initialize(init=init.Xavier(), ctx = ctx)
 
     """ 2. Dataset """
-    train_dataset, val_dataset = get_coco(opt, "./data/coco")
+    
+    train_dataset = get_coco(opt, "/in/train-index.tsv")
+    val_dataset = get_coco(opt, "/in/val-index.tsv")
     data_shape = opt.input_res
     batch_size = opt.batch_size
     num_workers = opt.num_workers
